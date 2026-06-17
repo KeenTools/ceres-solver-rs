@@ -39,6 +39,22 @@ fn main() {
 
     #[cfg(feature = "custom")]
     {
+        if [
+            "CERES_RS_LIB_DIR",
+            "CERES_RS_INCLUDE_DIRS",
+            "CERES_RS_LIBS",
+            "CERES_RS_FLAGS",
+        ]
+        .iter()
+        .all(|k| std::env::var(k).is_err())
+        {
+            panic!(
+                "ceres-solver-sys (custom feature): no ceres configuration found. \
+                 Set KEENTECH_DEPS_DIR to the keentech-deps repo root, or set the \
+                 CERES_RS_* env vars explicitly."
+            );
+        }
+
         if let Ok(flags) = std::env::var("CERES_RS_FLAGS") {
             for flag in flags.split(',') {
                 cc_build.flag(flag);
