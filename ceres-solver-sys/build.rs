@@ -5,6 +5,9 @@ fn main() {
 
     if let Ok(deps) = std::env::var("KEENTECH_DEPS_DIR") {
         println!("cargo:rerun-if-env-changed=KEENTECH_DEPS_DIR");
+        if !std::path::Path::new(&deps).is_absolute() {
+            panic!("KEENTECH_DEPS_DIR must be an absolute path, got: {deps:?}");
+        }
         let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
         let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
         let subdir = match (os.as_str(), arch.as_str()) {
