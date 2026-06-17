@@ -3,6 +3,34 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.cpp");
     println!("cargo:rerun-if-changed=src/lib.rs");
 
+    if let Ok(deps) = std::env::var("KEENTECH_DEPS_DIR") {
+        println!("cargo:rerun-if-env-changed=KEENTECH_DEPS_DIR");
+        let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+        let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+        let subdir = match (os.as_str(), arch.as_str()) {
+            ("linux", _) => "CERES_LINUX_CXX11",
+            ("macos", "aarch64") => "CERES_OSX_arm64",
+            ("macos", "x86_64") => "CERES_OSX_x86_64",
+            ("windows", _) => "CERES_WIN",
+            _ => panic!("KEENTECH_DEPS_DIR: unsupported target {os}/{arch}"),
+        };
+        let inc = format!("{deps}/{subdir}/include");
+        std::env::set_var("CERES_RS_LIB_DIR", format!("{deps}/{subdir}/lib"));
+        std::env::set_var(
+            "CERES_RS_INCLUDE_DIRS",
+            format!("{inc},{deps}/EIGEN_INCLUDE,{inc}/ceres/internal/miniglog"),
+        );
+        std::env::set_var("CERES_RS_LIBS", "ceres");
+        std::env::set_var(
+            "CERES_RS_FLAGS",
+            if os == "windows" {
+                "/std:c++14"
+            } else {
+                "-std=c++14"
+            },
+        );
+    }
+
     let mut cc_build = cxx_build::bridge("src/lib.rs");
     cc_build.file("src/lib.cpp");
 
