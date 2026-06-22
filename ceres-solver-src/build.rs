@@ -122,7 +122,7 @@ fn install_ceres(vendor_dir: &Path, glog_dirs: &DstDirs) -> DstDirs {
         .pic(true)
         // Most of the options described here:
         // http://ceres-solver.org/installation.html#customizing-the-build
-        .define("CUDA", "OFF")
+        .define("USE_CUDA", "OFF")
         .define("LAPACK", "OFF")
         .define("EIGENSPARSE", "ON")
         .define("SUITESPARSE", "OFF")
