@@ -72,7 +72,8 @@ namespace ceres {
     }
 
     SolverOptions::SolverOptions():
-        inner(Solver::Options()) {}
+        inner(Solver::Options()),
+        callbacks() {}
     bool SolverOptions::is_valid(std::string& error) const {
         return inner.IsValid(&error);
     }
@@ -220,8 +221,51 @@ namespace ceres {
     void SolverOptions::set_update_state_every_iteration(bool yes) {
         inner.update_state_every_iteration = yes;
     }
+    void SolverOptions::add_iteration_callback(rust::Box<RustIterationCallback> callback) {
+        callbacks.push_back(CustomIterationCallback(std::move(callback)));
+        // push_back may have reallocated the vector, so re-point the whole list.
+        inner.callbacks.resize(callbacks.size());
+        for (size_t i = 0; i < callbacks.size(); ++i) {
+            inner.callbacks[i] = &callbacks[i];
+        }
+    }
     std::unique_ptr<SolverOptions> new_solver_options() {
         return std::make_unique<SolverOptions>();
+    }
+
+    CustomIterationCallback::CustomIterationCallback(rust::Box<RustIterationCallback> inner):
+        inner(std::move(inner)) {}
+    CallbackReturnType CustomIterationCallback::operator()(const IterationSummary& summary) {
+        RustIterationSummary rust_summary{
+            static_cast<size_t>(summary.iteration),
+            summary.step_is_valid,
+            summary.step_is_nonmonotonic,
+            summary.step_is_successful,
+            summary.cost,
+            summary.cost_change,
+            summary.gradient_max_norm,
+            summary.gradient_norm,
+            summary.step_norm,
+            summary.relative_decrease,
+            summary.trust_region_radius,
+            summary.eta,
+            summary.step_size,
+            static_cast<size_t>(summary.line_search_function_evaluations),
+            static_cast<size_t>(summary.line_search_gradient_evaluations),
+            static_cast<size_t>(summary.line_search_iterations),
+            static_cast<size_t>(summary.linear_solver_iterations),
+            summary.iteration_time_in_seconds,
+            summary.step_solver_time_in_seconds,
+            summary.cumulative_time_in_seconds,
+        };
+        switch (inner->invoke(std::move(rust_summary))) {
+            case RustCallbackReturnType::SOLVER_ABORT:
+                return SOLVER_ABORT;
+            case RustCallbackReturnType::SOLVER_TERMINATE_SUCCESSFULLY:
+                return SOLVER_TERMINATE_SUCCESSFULLY;
+            default:
+                return SOLVER_CONTINUE;
+        }
     }
 
     SolverSummary::SolverSummary():

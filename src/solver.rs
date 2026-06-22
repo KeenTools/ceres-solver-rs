@@ -2,7 +2,9 @@
 
 use crate::error::SolverOptionsBuildingError;
 use crate::residual_block::ResidualBlockId;
+use crate::types::{CallbackReturnType, IterationSummary};
 
+use ceres_solver_sys::RustIterationCallback;
 use ceres_solver_sys::cxx::{UniquePtr, let_cxx_string};
 use ceres_solver_sys::ffi;
 pub use ceres_solver_sys::ffi::{
@@ -433,6 +435,24 @@ impl SolverOptionsBuilder {
     #[inline]
     pub fn update_state_every_iteration(mut self, yes: bool) -> Self {
         self.inner_mut().set_update_state_every_iteration(yes);
+        self
+    }
+
+    /// Add a callback invoked by the solver after every iteration.
+    ///
+    /// The callback receives an [IterationSummary] describing the iteration and returns a
+    /// [CallbackReturnType] telling the solver whether to continue, abort, or terminate
+    /// successfully. Multiple callbacks can be added and are invoked in the order they were added.
+    ///
+    /// Set [SolverOptionsBuilder::update_state_every_iteration] to `true` if the callback needs to
+    /// inspect the up-to-date parameter values.
+    #[inline]
+    pub fn add_iteration_callback(
+        mut self,
+        callback: impl FnMut(IterationSummary) -> CallbackReturnType + 'static,
+    ) -> Self {
+        let callback = RustIterationCallback(Box::new(callback));
+        self.inner_mut().add_iteration_callback(Box::new(callback));
         self
     }
 }
