@@ -172,6 +172,12 @@ namespace ceres {
     void SolverOptions::set_linear_solver_type(LinearSolverType linear_solver_type) {
         inner.linear_solver_type = linear_solver_type;
     }
+    void SolverOptions::set_use_inner_iterations(bool yes) {
+        inner.use_inner_iterations = yes;
+    }
+    void SolverOptions::set_inner_iteration_tolerance(double tolerance) {
+        inner.inner_iteration_tolerance = tolerance;
+    }
     void SolverOptions::set_preconditioner_type(PreconditionerType preconditioner_type) {
         inner.preconditioner_type = preconditioner_type;
     }
