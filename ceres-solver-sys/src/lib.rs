@@ -111,6 +111,39 @@ pub mod ffi {
         TEXTFILE,
     }
 
+    /// Action requested by an iteration callback, mirrors [ceres::CallbackReturnType].
+    #[repr(u32)]
+    enum RustCallbackReturnType {
+        SOLVER_CONTINUE,
+        SOLVER_ABORT,
+        SOLVER_TERMINATE_SUCCESSFULLY,
+    }
+
+    /// Snapshot of a single minimizer iteration, mirrors [ceres::IterationSummary].
+    #[derive(Default)]
+    struct RustIterationSummary {
+        iteration: usize,
+        step_is_valid: bool,
+        step_is_nonmonotonic: bool,
+        step_is_successful: bool,
+        cost: f64,
+        cost_change: f64,
+        gradient_max_norm: f64,
+        gradient_norm: f64,
+        step_norm: f64,
+        relative_decrease: f64,
+        trust_region_radius: f64,
+        eta: f64,
+        step_size: f64,
+        line_search_function_evaluations: usize,
+        line_search_gradient_evaluations: usize,
+        line_search_iterations: usize,
+        linear_solver_iterations: usize,
+        iteration_time_in_seconds: f64,
+        step_solver_time_in_seconds: f64,
+        cumulative_time_in_seconds: f64,
+    }
+
     extern "Rust" {
         type RustCostFunction<'cost>;
         unsafe fn evaluate(
@@ -122,6 +155,12 @@ pub mod ffi {
 
         type RustLossFunction;
         unsafe fn evaluate(self: &RustLossFunction, sq_norm: f64, out: *mut f64);
+
+        type RustIterationCallback<'cb>;
+        unsafe fn invoke<'cb>(
+            self: &mut RustIterationCallback<'cb>,
+            summary: RustIterationSummary,
+        ) -> RustCallbackReturnType;
     }
 
     unsafe extern "C++" {
@@ -362,6 +401,10 @@ pub mod ffi {
             gradient_check_numeric_derivative_relative_step_size: f64,
         );
         fn set_update_state_every_iteration(self: Pin<&mut SolverOptions>, yes: bool);
+        fn add_iteration_callback<'cb>(
+            self: Pin<&mut SolverOptions>,
+            callback: Box<RustIterationCallback<'cb>>,
+        );
 
         /// Create an instance wrapping Solver::Options.
         fn new_solver_options() -> UniquePtr<SolverOptions>;
@@ -424,6 +467,26 @@ impl RustLossFunction {
 
 impl From<Box<dyn Fn(f64, *mut f64)>> for RustLossFunction {
     fn from(value: Box<dyn Fn(f64, *mut f64)>) -> Self {
+        Self(value)
+    }
+}
+
+pub struct RustIterationCallback<'cb>(
+    pub Box<dyn FnMut(ffi::RustIterationSummary) -> ffi::RustCallbackReturnType + 'cb>,
+);
+
+impl RustIterationCallback<'_> {
+    pub fn invoke(&mut self, summary: ffi::RustIterationSummary) -> ffi::RustCallbackReturnType {
+        (self.0)(summary)
+    }
+}
+
+impl<'cb> From<Box<dyn FnMut(ffi::RustIterationSummary) -> ffi::RustCallbackReturnType + 'cb>>
+    for RustIterationCallback<'cb>
+{
+    fn from(
+        value: Box<dyn FnMut(ffi::RustIterationSummary) -> ffi::RustCallbackReturnType + 'cb>,
+    ) -> Self {
         Self(value)
     }
 }
