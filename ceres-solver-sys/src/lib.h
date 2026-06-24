@@ -51,13 +51,12 @@ namespace ceres {
     struct CustomIterationCallback : public IterationCallback {
         rust::Box<RustIterationCallback> inner;
         CustomIterationCallback(rust::Box<RustIterationCallback> inner);
-        // IterationCallback impl
         virtual CallbackReturnType operator()(const IterationSummary& summary) override;
     };
 
     struct SolverOptions {
         Solver::Options inner;
-        std::vector<CustomIterationCallback> callbacks;
+        std::vector<std::unique_ptr<CustomIterationCallback>> iteration_callbacks;
         SolverOptions();
         bool is_valid(std::string& error) const;
         void set_minimizer_type(MinimizerType minimizer_type);
