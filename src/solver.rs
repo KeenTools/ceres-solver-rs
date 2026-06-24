@@ -15,40 +15,53 @@ pub use ceres_solver_sys::ffi::{
 };
 use std::borrow::Cow;
 use std::ffi::OsStr;
+use std::marker::PhantomData;
 use std::path::Path;
 use std::pin::Pin;
 
-pub struct SolverOptions(pub(crate) UniquePtr<ffi::SolverOptions>);
+pub struct SolverOptions<'lt> {
+    pub(crate) inner: UniquePtr<ffi::SolverOptions>,
+    _lifetime: PhantomData<&'lt ()>,
+}
 
-impl SolverOptions {
-    pub fn builder() -> SolverOptionsBuilder {
+impl<'lt> SolverOptions<'lt> {
+    pub fn builder() -> SolverOptionsBuilder<'lt> {
         SolverOptionsBuilder::new()
     }
 }
 
-impl Default for SolverOptions {
+impl Default for SolverOptions<'_> {
     fn default() -> Self {
         Self::builder().build().unwrap()
     }
 }
 
-pub struct SolverOptionsBuilder(pub(crate) UniquePtr<ffi::SolverOptions>);
+pub struct SolverOptionsBuilder<'lt> {
+    pub(crate) inner: UniquePtr<ffi::SolverOptions>,
+    _lifetime: PhantomData<&'lt ()>,
+}
 
-impl SolverOptionsBuilder {
+impl<'lt> SolverOptionsBuilder<'lt> {
     pub fn new() -> Self {
-        let slf = Self(ffi::new_solver_options());
+        let slf = Self {
+            inner: ffi::new_solver_options(),
+            _lifetime: PhantomData,
+        };
         // Remove annoying output from ceres
         slf.logging_type(LoggingType::SILENT)
     }
 
-    pub fn build(self) -> Result<SolverOptions, SolverOptionsBuildingError> {
+    pub fn build(self) -> Result<SolverOptions<'lt>, SolverOptionsBuildingError> {
         self.validate()?;
-        Ok(SolverOptions(self.0))
+        Ok(SolverOptions {
+            inner: self.inner,
+            _lifetime: self._lifetime,
+        })
     }
 
     pub fn validate(&self) -> Result<(), SolverOptionsBuildingError> {
         let_cxx_string!(msg = "");
-        if self.0.is_valid(msg.as_mut()) {
+        if self.inner.is_valid(msg.as_mut()) {
             Ok(())
         } else {
             Err(SolverOptionsBuildingError::Invalid(
@@ -62,7 +75,7 @@ impl SolverOptionsBuilder {
     }
 
     fn inner_mut(&mut self) -> Pin<&mut ffi::SolverOptions> {
-        self.0
+        self.inner
             .as_mut()
             .expect("Underlying C++ unique_ptr<SolverOptions> must not hold nullptr")
     }
@@ -443,13 +456,10 @@ impl SolverOptionsBuilder {
     /// The callback receives an [IterationSummary] describing the iteration and returns a
     /// [CallbackReturnType] telling the solver whether to continue, abort, or terminate
     /// successfully. Multiple callbacks can be added and are invoked in the order they were added.
-    ///
-    /// Set [SolverOptionsBuilder::update_state_every_iteration] to `true` if the callback needs to
-    /// inspect the up-to-date parameter values.
     #[inline]
     pub fn add_iteration_callback(
         mut self,
-        callback: impl FnMut(IterationSummary) -> CallbackReturnType + 'static,
+        callback: impl FnMut(IterationSummary) -> CallbackReturnType + 'lt,
     ) -> Self {
         let callback = RustIterationCallback(Box::new(callback));
         self.inner_mut().add_iteration_callback(Box::new(callback));
@@ -457,7 +467,7 @@ impl SolverOptionsBuilder {
     }
 }
 
-impl Default for SolverOptionsBuilder {
+impl<'lt> Default for SolverOptionsBuilder<'lt> {
     fn default() -> Self {
         Self::new()
     }

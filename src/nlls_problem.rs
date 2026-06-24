@@ -351,7 +351,7 @@ impl<'cost> NllsProblem<'cost> {
         let mut summary = SolverSummary::new();
         ffi::solve(
             options
-                .0
+                .inner
                 .as_ref()
                 .expect("Underlying C++ SolverOptions must hold non-null pointer"),
             self.inner_mut(),

@@ -73,7 +73,8 @@ namespace ceres {
 
     SolverOptions::SolverOptions():
         inner(Solver::Options()),
-        callbacks() {}
+        iteration_callbacks() {}
+
     bool SolverOptions::is_valid(std::string& error) const {
         return inner.IsValid(&error);
     }
@@ -222,12 +223,10 @@ namespace ceres {
         inner.update_state_every_iteration = yes;
     }
     void SolverOptions::add_iteration_callback(rust::Box<RustIterationCallback> callback) {
-        callbacks.push_back(CustomIterationCallback(std::move(callback)));
-        // push_back may have reallocated the vector, so re-point the whole list.
-        inner.callbacks.resize(callbacks.size());
-        for (size_t i = 0; i < callbacks.size(); ++i) {
-            inner.callbacks[i] = &callbacks[i];
-        }
+        // The callbacks are owned through unique_ptr, so their addresses stay stable when the
+        // vector grows. That keeps the raw pointers stored in inner.callbacks valid.
+        iteration_callbacks.push_back(std::make_unique<CustomIterationCallback>(std::move(callback)));
+        inner.callbacks.push_back(iteration_callbacks.back().get());
     }
     std::unique_ptr<SolverOptions> new_solver_options() {
         return std::make_unique<SolverOptions>();
