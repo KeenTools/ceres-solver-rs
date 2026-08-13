@@ -83,6 +83,10 @@ fn install_glog(vendor_dir: &Path) -> DstDirs {
     let mut config = cmake_config(&src_dir);
     config
         .profile("Release")
+        // Force `lib` regardless of distro: GNUInstallDirs defaults to `lib64`
+        // on non-Debian 64-bit Linux (e.g. RHEL/CentOS), which `resolve_lib_dir`
+        // below does not account for.
+        .define("CMAKE_INSTALL_LIBDIR", "lib")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("WITH_GFLAGS", "OFF")
         .define("WITH_GTEST", "OFF")
@@ -120,6 +124,9 @@ fn install_ceres(vendor_dir: &Path, glog_dirs: &DstDirs) -> DstDirs {
     config
         .profile("Release")
         .pic(true)
+        // Same reasoning as in install_glog: pin to `lib` so `resolve_lib_dir`
+        // finds it regardless of distro's GNUInstallDirs default.
+        .define("CMAKE_INSTALL_LIBDIR", "lib")
         // Most of the options described here:
         // http://ceres-solver.org/installation.html#customizing-the-build
         .define("USE_CUDA", "OFF")
